@@ -11,7 +11,8 @@ const defaultDescs = {
 	"CurlyCloze": "Convert {cloze deletions} -> {{c1::cloze deletions}} on note types that have a 'Cloze' in their name.",
 	"CurlyCloze - Highlights to Clozes": "Convert ==highlights== -> {highlights} to be processed by CurlyCloze.",
 	"ID Comments": "Wrap note IDs in a HTML comment.",
-	"Add Obsidian Tags": "Interpret #tags in the fields of a note as Anki tags, removing them from the note text in Anki."
+	"Add Obsidian Tags": "Interpret #tags in the fields of a note as Anki tags, removing them from the note text in Anki.",
+	"Convert Tag Hierarchy": "Convert nested Obsidian tags (tag/subtag) into Anki hierarchical tags (tag::subtag), so they render as a tree in Anki. Disable to send the raw slash form."
 }
 
 export const DEFAULT_IGNORED_FILE_GLOBS = [
@@ -194,6 +195,10 @@ export class SettingsTab extends PluginSettingTab {
 		// To account for new add obsidian tags
 		if (!(plugin.settings["Defaults"].hasOwnProperty("Add Obsidian Tags"))) {
 			plugin.settings["Defaults"]["Add Obsidian Tags"] = false
+		}
+		// To account for new convert tag hierarchy
+		if (!(plugin.settings["Defaults"].hasOwnProperty("Convert Tag Hierarchy"))) {
+			plugin.settings["Defaults"]["Convert Tag Hierarchy"] = true
 		}
 		for (let key of Object.keys(plugin.settings["Defaults"])) {
 			// To account for removal of regex setting

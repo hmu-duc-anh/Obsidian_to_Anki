@@ -1,4 +1,26 @@
-# Obsidian_to_Anki
+# Obsidian_to_Anki (maintained fork)
+
+**Fork of [ObsidianToAnki/Obsidian_to_Anki](https://github.com/ObsidianToAnki/Obsidian_to_Anki)** (upstream unmaintained since early 2024), updated for current Obsidian. Maintainer: [hmu-duc-anh](https://github.com/hmu-duc-anh).
+
+## What this fork changes (v4.0.0)
+
+- **Frontmatter tags read as real YAML.** File-level tags are now read through Obsidian's own frontmatter parser, so the best-practice list form works:
+  ```yaml
+  tags:
+    - obgyn/obstetrics/preeclampsia
+    - french/verbe/3e_groupe
+  ```
+  Inline arrays (`tags: [a, b]`), single strings, legacy space-delimited strings (`tags: a b c`), and the `tag` key all work too. The legacy FILE TAGS line in the note body still works unchanged.
+- **Nested tags become Anki tag hierarchies.** `obgyn/obstetrics/preeclampsia` arrives in Anki as `obgyn::obstetrics::preeclampsia` — a collapsible tree in Anki's sidebar instead of one flat slash-string. Controlled by the new **Convert Tag Hierarchy** toggle (Defaults section, on by default).
+- **Unicode and nested inline tags.** `#tags` scanned from note fields (the Add Obsidian Tags feature) now match Unicode (e.g. Vietnamese) and nested (`#a/b`) tags; the old pattern only matched ASCII `\w+`.
+- **Target deck via YAML.** The Target Deck key (e.g. `anki-deck:`) is read through the frontmatter parser when present there, so quoted values work.
+- **Frontmatter is never card material.** The YAML block is excluded from note/regex scanning, so custom card regexes can no longer accidentally match metadata.
+- Inherits the post-3.6.0 upstream fixes that never shipped in a release (including the folder-walk fix for newer Obsidian API).
+
+Original README follows.
+
+---
+
 Plugin to add flashcards from a text or markdown file to Anki. Run in Obsidian as a plugin, or from the command-line as a python script. Built with [Obsidian](https://obsidian.md/) markdown syntax in mind. Supports **user-defined custom syntax for flashcards.**  
 See the [Trello](https://trello.com/b/6MXEizGg/obsidiantoanki) for planned features.
 

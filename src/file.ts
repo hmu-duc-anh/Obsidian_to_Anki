@@ -8,7 +8,10 @@ import { Md5 } from 'ts-md5/dist/md5';
 import * as AnkiConnect from './anki'
 import * as c from './constants'
 import { FormatConverter } from './format'
-import { CachedMetadata, HeadingCache } from 'obsidian'
+import { CachedMetadata, HeadingCache, parseFrontMatterTags, parseFrontMatterEntry } from 'obsidian'
+import { normalizeTagList } from './tags'
+
+const FRONTMATTER_REGEXP: RegExp = /^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/
 
 const double_regexp: RegExp = /(?:\r\n|\r|\n)((?:\r\n|\r|\n)(?:<!--)?ID: \d+)/g
 
@@ -79,7 +82,7 @@ abstract class AbstractFile {
 
     frozen_fields_dict: FROZEN_FIELDS_DICT
     target_deck: string
-    global_tags: string
+    global_tags: string[]
 
     notes_to_add: AnkiConnectNote[]
     id_indexes: number[]
@@ -128,14 +131,62 @@ abstract class AbstractFile {
         this.frozen_fields_dict = frozen_fields_dict
     }
 
+    frontmatter_bounds(): [number, number] {
+        /*Span of the YAML frontmatter block in this file, or [-1, -1] if none.*/
+        const match = this.file.match(FRONTMATTER_REGEXP)
+        return match ? [0, match[0].length] : [-1, -1]
+    }
+
+    private in_frontmatter(index: number): boolean {
+        const bounds = this.frontmatter_bounds()
+        return bounds[0] !== -1 && index >= bounds[0] && index < bounds[1]
+    }
+
     setup_target_deck() {
+        // Frontmatter key (e.g. `anki-deck: My::Deck`) read through the YAML
+        // parser first — handles quoting that a raw line-scan mangles.
+        const frontmatter = this.file_cache ? this.file_cache.frontmatter : null
+        if (frontmatter) {
+            const value = parseFrontMatterEntry(frontmatter, this.data.deck_line_key)
+            if (typeof value === "string" && value.trim().length) {
+                this.target_deck = value.trim()
+                return
+            }
+        }
         const result = this.file.match(this.data.DECK_REGEXP)
         this.target_deck = result ? result[1] : this.data.template["deckName"]
     }
 
     setup_global_tags() {
+        let raw_tags: string[] = []
+        // 1. Frontmatter tags via Obsidian's own parser — accepts the
+        // best-practice YAML list form, inline arrays, and legacy strings,
+        // under both `tags` and `tag` keys.
+        const frontmatter = this.file_cache ? this.file_cache.frontmatter : null
+        if (frontmatter) {
+            const fm_tags = parseFrontMatterTags(frontmatter)
+            if (fm_tags) {
+                raw_tags.push(...fm_tags)
+            }
+            // A custom File Tags Line key that isn't the standard tags/tag
+            // pair is read from frontmatter too.
+            const key = this.data.tag_line_key
+            if (key && key.toLowerCase() !== "tags" && key.toLowerCase() !== "tag") {
+                const value = parseFrontMatterEntry(frontmatter, key)
+                if (typeof value === "string") {
+                    raw_tags.push(...value.split(TAG_SEP))
+                } else if (Array.isArray(value)) {
+                    raw_tags.push(...value.map(String))
+                }
+            }
+        }
+        // 2. Legacy FILE TAGS line in the note body (outside frontmatter —
+        // frontmatter belongs to the YAML parser above).
         const result = this.file.match(this.data.TAG_REGEXP)
-        this.global_tags = result ? result[1] : ""
+        if (result && !this.in_frontmatter(result.index)) {
+            raw_tags.push(...result[1].split(TAG_SEP))
+        }
+        this.global_tags = normalizeTagList(raw_tags, this.data.convert_tag_hierarchy)
     }
 
     getHash(): string {
@@ -243,7 +294,7 @@ abstract class AbstractFile {
         let actions: AnkiConnect.AnkiConnectRequest[] = []
         for (let parsed of this.notes_to_edit) {
             actions.push(
-                AnkiConnect.addTags([parsed.identifier], parsed.note.tags.join(" ") + " " + this.global_tags)
+                AnkiConnect.addTags([parsed.identifier], parsed.note.tags.concat(this.global_tags).join(" ").trim())
             )
         }
         return AnkiConnect.multi(actions)
@@ -266,6 +317,11 @@ export class AllFile extends AbstractFile {
 
     add_spans_to_ignore() {
         this.ignore_spans = []
+        const fm_bounds = this.frontmatter_bounds()
+        if (fm_bounds[0] !== -1) {
+            // YAML frontmatter is metadata, never card material
+            this.ignore_spans.push(fm_bounds)
+        }
         this.ignore_spans.push(...spans(this.data.FROZEN_REGEXP, this.file))
         const deck_result = this.file.match(this.data.DECK_REGEXP)
         if (deck_result) {
@@ -317,7 +373,7 @@ export class AllFile extends AbstractFile {
             )
             if (parsed.identifier == null) {
                 // Need to make sure global_tags get added
-                parsed.note.tags.push(...this.global_tags.split(TAG_SEP))
+                parsed.note.tags.push(...this.global_tags)
                 this.notes_to_add.push(parsed.note)
                 this.id_indexes.push(position)
             } else if (!this.data.EXISTING_IDS.includes(parsed.identifier)) {
@@ -355,7 +411,7 @@ export class AllFile extends AbstractFile {
             )
             if (parsed.identifier == null) {
                 // Need to make sure global_tags get added
-                parsed.note.tags.push(...this.global_tags.split(TAG_SEP))
+                parsed.note.tags.push(...this.global_tags)
                 this.inline_notes_to_add.push(parsed.note)
                 this.inline_id_indexes.push(position)
             } else if (!this.data.EXISTING_IDS.includes(parsed.identifier)) {
@@ -408,7 +464,7 @@ export class AllFile extends AbstractFile {
                             this.ignore_spans.pop()
                             continue
                         }
-                        parsed.note.tags.push(...this.global_tags.split(TAG_SEP))
+                        parsed.note.tags.push(...this.global_tags)
                         this.regex_notes_to_add.push(parsed.note)
                         this.regex_id_indexes.push(match.index + match[0].length)
                     }

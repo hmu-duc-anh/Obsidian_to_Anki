@@ -42,6 +42,9 @@ export async function settingToData(app: App, settings: PluginSettings, fields_d
     result.comment = settings.Defaults["ID Comments"]
     result.add_context = settings.Defaults["Add Context"]
     result.add_obs_tags = settings.Defaults["Add Obsidian Tags"]
+    result.convert_tag_hierarchy = settings.Defaults["Convert Tag Hierarchy"] ?? true
+    result.tag_line_key = settings.Syntax["File Tags Line"]
+    result.deck_line_key = settings.Syntax["Target Deck Line"]
     result.ignored_file_globs = settings.IGNORED_FILE_GLOBS ?? [];
 
     return result

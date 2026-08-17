@@ -7,12 +7,15 @@ import { FormatConverter } from './format'
 import { AnkiConnectNote, AnkiConnectNoteAndID } from './interfaces/note-interface'
 import { FIELDS_DICT, FROZEN_FIELDS_DICT } from './interfaces/field-interface'
 import { FileData } from './interfaces/settings-interface'
+import { normalizeTagList } from './tags'
 
 const TAG_PREFIX:string = "Tags: "
 export const TAG_SEP:string = " "
 export const ID_REGEXP_STR: string = String.raw`\n?(?:<!--)?(?:ID: (\d+).*)`
 export const TAG_REGEXP_STR: string = String.raw`(Tags: .*)`
-const OBS_TAG_REGEXP: RegExp = /#(\w+)/g
+// Obsidian tag characters: any letter/number (Unicode, so Vietnamese and
+// accented tags match), plus _ - and the / nesting separator.
+const OBS_TAG_REGEXP: RegExp = /#([\p{L}\p{N}\p{M}_\/-]+)/gu
 
 const ANKI_CLOZE_REGEXP: RegExp = /{{c\d+::[\s\S]+?}}/
 export const CLOZE_ERROR: number = 42
@@ -105,7 +108,7 @@ abstract class AbstractNote {
 				template["fields"][key] = template["fields"][key].replace(OBS_TAG_REGEXP, "")
 	        }
 		}
-        template["tags"].push(...this.tags)
+        template["tags"].push(...normalizeTagList(this.tags, data.convert_tag_hierarchy))
         template["deckName"] = deck
         return {note: template, identifier: this.identifier}
     }
@@ -310,7 +313,7 @@ export class RegexNote {
 				template["fields"][key] = template["fields"][key].replace(OBS_TAG_REGEXP, "")
 	        }
 		}
-		template["tags"].push(...this.tags)
+		template["tags"].push(...normalizeTagList(this.tags, data.convert_tag_hierarchy))
         template["deckName"] = deck
 		return {note: template, identifier: this.identifier}
 	}

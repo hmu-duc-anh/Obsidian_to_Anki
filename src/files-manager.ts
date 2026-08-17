@@ -5,6 +5,7 @@ import { AllFile } from './file'
 import * as AnkiConnect from './anki'
 import { basename } from 'path'
 import multimatch from "multimatch"
+import { normalizeTagList } from './tags'
 interface addNoteResponse {
     result: number,
     error: string | null
@@ -115,7 +116,7 @@ export class FileManager {
             }
         }
         tags_list.push(...this.data.template.tags)
-        return tags_list
+        return normalizeTagList(tags_list, this.data.convert_tag_hierarchy)
     }
 
     dataToFileData(file: TFile): FileData {
